@@ -133,7 +133,7 @@ class RefreshTokenCache(object):
             logger.warning('Failed to save refresh_token: %s', e)
 
 
-def get_auth(credentials_prompt, refresh_token_cache):
+def get_auth(credentials_prompt, refresh_token_cache, email="", password=""):
     """Authenticate with Google.
 
     Args:
@@ -161,7 +161,7 @@ def get_auth(credentials_prompt, refresh_token_cache):
             logger.info('Failed to authenticate using refresh token: %s', e)
             logger.info('Authenticating with credentials')
             authorization_code = _get_authorization_code(
-                session, credentials_prompt
+                session, credentials_prompt, email, password
             )
             access_token, refresh_token = _auth_with_code(
                 session, authorization_code
@@ -184,6 +184,19 @@ def get_auth_stdin(refresh_token_filename):
     """
     refresh_token_cache = RefreshTokenCache(refresh_token_filename)
     return get_auth(CredentialsPrompt(), refresh_token_cache)
+
+def get_auth_with_args(email, password, refresh_token_filename):
+    """Simple wrapper for :func:`get_auth` that prompts the user using stdin.
+
+    Args:
+        refresh_token_filename (str): Path to file where refresh token will be
+            cached.
+
+    Raises:
+        GoogleAuthError: If authentication with Google fails.
+    """
+    refresh_token_cache = RefreshTokenCache(refresh_token_filename)
+    return get_auth(None, refresh_token_cache, email, password)
 
 
 class Browser(object):
@@ -250,7 +263,7 @@ class Browser(object):
         return self._session.cookies[name]
 
 
-def _get_authorization_code(session, credentials_prompt):
+def _get_authorization_code(session, credentials_prompt, email="", password=""):
     """Get authorization code using Google account credentials.
 
     Because hangups can't use a real embedded browser, it has to use the
@@ -265,10 +278,10 @@ def _get_authorization_code(session, credentials_prompt):
     """
     browser = Browser(session, OAUTH2_LOGIN_URL)
 
-    email = credentials_prompt.get_email()
+    email = email if email else credentials_prompt.get_email()
     browser.submit_form(FORM_SELECTOR, {EMAIL_SELECTOR: email})
 
-    password = credentials_prompt.get_password()
+    password = password if password else credentials_prompt.get_password()
     browser.submit_form(FORM_SELECTOR, {PASSWORD_SELECTOR: password})
 
     if browser.has_selector(VERIFICATION_FORM_SELECTOR):
@@ -382,4 +395,5 @@ def _get_session_cookies(session, access_token):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    print(get_auth_stdin('refresh_token.txt'))
+    # print(get_auth_stdin('refresh_token.txt'))
+    print(get_auth_with_args("email", "password", 'refresh_token.txt'))
